@@ -1,0 +1,391 @@
+import { Router, Request, Response } from 'express';
+import pool from '../db/connection';
+import qwenAI from '../services/qwen-ai';
+import multer from 'multer';
+import path from 'path';
+import fs from 'fs';
+
+export const aiRouter = Router();
+
+// 配置文件上传
+const storage = multer.diskStorage({
+  destination: './uploads/',
+  filename: (req, file, cb) => {
+    const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+    cb(null, uniqueSuffix + path.extname(file.originalname));
+  },
+});
+const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
+
+// 确保上传目录存在
+if (!fs.existsSync('./uploads')) {
+  fs.mkdirSync('./uploads');
+}
+
+// POST /api/ai/generate-disclosure - AI 辅助生成交底书
+aiRouter.post('/generate-disclosure', async (req: Request, res: Response) => {
+  try {
+    const { case_id, tech_field, source_content, innovation_context } = req.body;
+    
+    if (!source_content) {
+      return res.status(400).json({ code: -1, message: '缺少技术描述内容' });
+    }
+
+    console.log('开始生成交底书...', { case_id, tech_field });
+
+    // 调用 Qwen 生成交底书
+    const result = await qwenAI.generateDisclosure({
+      techField: tech_field || '未知领域',
+      rawContent: source_content,
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: 'AI 生成失败',
+        error: result.error 
+      });
+    }
+
+    // 如果有上下文，生成创新思路
+    let innovationIdeas = [];
+    if (innovation_context) {
+      const ideasResult = await qwenAI.generateInnovationIdeas({
+        techField: tech_field || '未知领域',
+        currentSolution: source_content,
+      });
+      
+      if (ideasResult.success) {
+        innovationIdeas = ideasResult.content.split(/\d+\./).filter(Boolean).slice(1, 6);
+      }
+    }
+
+    // 保存 AI 生成结果到数据库
+    if (case_id) {
+      await pool.query(
+        'UPDATE sys_disclosure SET ai_generate_content = ?, ai_suggest = ?, m06_stage = ? WHERE case_id = ?',
+        [result.content, JSON.stringify(innovationIdeas), 'AI_GENERATED', case_id]
+      );
+
+      // 记录 AI 日志
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
+        [case_id, 'M06', 'generate_disclosure', JSON.stringify({ tech_field, source_length: source_content.length }), JSON.stringify({ output_length: result.content.length })]
+      );
+    }
+
+    res.json({ 
+      code: 0, 
+      data: { 
+        structure: result.content,
+        ideas: innovationIdeas,
+        usage: result.usage
+      } 
+    });
+  } catch (err: any) {
+    console.error('AI 生成错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/check-ai-rate - 检查文本 AI 率
+aiRouter.post('/check-ai-rate', async (req: Request, res: Response) => {
+  try {
+    const { case_id, content, doc_type } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ code: -1, message: '缺少文本内容' });
+    }
+
+    console.log('开始检测 AI 率...', { case_id, doc_type, content_length: content.length });
+
+    // 调用 Qwen 检测 AI 率
+    const result = await qwenAI.detectAIRate(content);
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: 'AI 检测失败',
+        error: result.error 
+      });
+    }
+
+    // 解析 AI 率（从返回文本中提取百分比）
+    const aiRateMatch = result.content.match(/AI生成率[：:]\s*(\d+)%/);
+    const aiRate = aiRateMatch ? parseFloat(aiRateMatch[1]) : 50;
+
+    // 提取修改建议
+    const suggestionsMatch = result.content.match(/修改建议[：:]([\s\S]*)/);
+    const suggestions = suggestionsMatch ? suggestionsMatch[1].trim().split(/\n+/).filter(Boolean) : [];
+
+    // 保存到数据库
+    if (case_id && doc_type === 'spec') {
+      await pool.query(
+        'UPDATE sys_writing SET ai_check_rate = ? WHERE case_id = ?',
+        [aiRate, case_id]
+      );
+    }
+
+    // 记录 AI 日志
+    if (case_id) {
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data, human_feedback) VALUES (?, ?, ?, ?, ?, ?)',
+        [case_id, 'M07', 'check_ai_rate', JSON.stringify({ content_length: content.length }), JSON.stringify({ ai_rate: aiRate }), JSON.stringify(suggestions)]
+      );
+    }
+
+    res.json({ 
+      code: 0, 
+      data: { 
+        aiRate,
+        analysis: result.content,
+        suggestions,
+        usage: result.usage
+      } 
+    });
+  } catch (err: any) {
+    console.error('AI 率检测错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/generate-spec - 生成专利说明书
+aiRouter.post('/generate-spec', async (req: Request, res: Response) => {
+  try {
+    const { case_id, disclosure } = req.body;
+    
+    if (!disclosure) {
+      return res.status(400).json({ code: -1, message: '缺少交底书内容' });
+    }
+
+    console.log('开始生成说明书...', { case_id });
+
+    const result = await qwenAI.generatePatentSpec({
+      title: disclosure.title || '未命名专利',
+      techField: disclosure.tech_field || '',
+      problem: disclosure.problem || '',
+      solution: disclosure.solution || '',
+      effects: disclosure.effects || '',
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: '说明书生成失败',
+        error: result.error 
+      });
+    }
+
+    // 保存说明书
+    if (case_id) {
+      await pool.query(
+        'INSERT INTO sys_writing (case_id, spec_content, m07_status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE spec_content = VALUES(spec_content)',
+        [case_id, result.content, 'drafting']
+      );
+
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
+        [case_id, 'M07', 'generate_spec', JSON.stringify({ disclosure }), JSON.stringify({ spec_length: result.content.length })]
+      );
+    }
+
+    res.json({ 
+      code: 0, 
+      data: { 
+        specContent: result.content,
+        usage: result.usage
+      } 
+    });
+  } catch (err: any) {
+    console.error('说明书生成错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/generate-claims - 生成权利要求书
+aiRouter.post('/generate-claims', async (req: Request, res: Response) => {
+  try {
+    const { case_id, spec_content } = req.body;
+    
+    if (!spec_content) {
+      return res.status(400).json({ code: -1, message: '缺少说明书内容' });
+    }
+
+    console.log('开始生成权利要求书...', { case_id });
+
+    const result = await qwenAI.generateClaims(spec_content);
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: '权利要求书生成失败',
+        error: result.error 
+      });
+    }
+
+    // 保存权利要求书
+    if (case_id) {
+      await pool.query(
+        'UPDATE sys_writing SET claim_content = ? WHERE case_id = ?',
+        [result.content, case_id]
+      );
+
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
+        [case_id, 'M07', 'generate_claims', JSON.stringify({ spec_length: spec_content.length }), JSON.stringify({ claims_length: result.content.length })]
+      );
+    }
+
+    res.json({ 
+      code: 0, 
+      data: { 
+        claimsContent: result.content,
+        usage: result.usage
+      } 
+    });
+  } catch (err: any) {
+    console.error('权利要求书生成错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/review - AI 质检审核
+aiRouter.post('/review', async (req: Request, res: Response) => {
+  try {
+    const { case_id, spec_content, claims_content, disclosure_content } = req.body;
+    
+    if (!spec_content || !claims_content) {
+      return res.status(400).json({ code: -1, message: '缺少审核内容' });
+    }
+
+    console.log('开始 AI 质检审核...', { case_id });
+
+    const result = await qwenAI.generateReviewAdvice({
+      specContent: spec_content,
+      claimsContent: claims_content,
+      disclosureContent: disclosure_content || '',
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: 'AI 审核失败',
+        error: result.error 
+      });
+    }
+
+    // 保存审核结果
+    if (case_id) {
+      await pool.query(
+        'INSERT INTO sys_quality_check (case_id, ai_advice, m08_status) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE ai_advice = VALUES(ai_advice)',
+        [case_id, result.content, 'ai_reviewed']
+      );
+
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
+        [case_id, 'M08', 'quality_review', JSON.stringify({ doc_types: ['spec', 'claims'] }), JSON.stringify({ advice_length: result.content.length })]
+      );
+    }
+
+    res.json({ 
+      code: 0, 
+      data: { 
+        reviewAdvice: result.content,
+        usage: result.usage
+      } 
+    });
+  } catch (err: any) {
+    console.error('AI 审核错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/check-terminology - 术语一致性检查
+aiRouter.post('/check-terminology', async (req: Request, res: Response) => {
+  try {
+    const { content } = req.body;
+    
+    if (!content) {
+      return res.status(400).json({ code: -1, message: '缺少检查内容' });
+    }
+
+    const result = await qwenAI.checkTerminologyConsistency(content);
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: '术语检查失败',
+        error: result.error 
+      });
+    }
+
+    res.json({ 
+      code: 0, 
+      data: { 
+        report: result.content,
+        usage: result.usage
+      } 
+    });
+  } catch (err: any) {
+    console.error('术语检查错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/innovate - 生成创新思路
+aiRouter.post('/innovate', async (req: Request, res: Response) => {
+  try {
+    const { tech_field, current_solution, prior_arts } = req.body;
+    
+    if (!tech_field || !current_solution) {
+      return res.status(400).json({ code: -1, message: '缺少必要参数' });
+    }
+
+    const result = await qwenAI.generateInnovationIdeas({
+      techField: tech_field,
+      currentSolution: current_solution,
+      priorArts: prior_arts,
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: '创新思路生成失败',
+        error: result.error 
+      });
+    }
+
+    res.json({ 
+      code: 0, 
+      data: { 
+        ideas: result.content,
+        usage: result.usage
+      } 
+    });
+  } catch (err: any) {
+    console.error('创新思路生成错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/upload - 文件上传处理
+aiRouter.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({ code: -1, message: '没有上传文件' });
+    }
+
+    res.json({ 
+      code: 0, 
+      data: { 
+        filename: req.file.filename,
+        originalname: req.file.originalname,
+        path: req.file.path,
+        size: req.file.size
+      } 
+    });
+  } catch (err: any) {
+    console.error('文件上传错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});

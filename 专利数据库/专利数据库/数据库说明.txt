@@ -1,0 +1,10 @@
+数据库名：vast_patent_system
+编码：utf8mb4
+5张数据表：
+1.sys_case：案件主表，case_id主键，case_status(待交底/撰写中/待质检/已归档)
+2.sys_disclosure：交底信息，ai_generate_content存放本地AI生成文本
+3.sys_writing：专利撰写内容、AI查重数据
+4.sys_quality_check：质检审核记录
+5.sys_operation_log：全流程操作日志
+关联规则：全部子表通过case_id关联案件主表
+部署：执行02_全库文件即可一键初始化数据库+测试数据
