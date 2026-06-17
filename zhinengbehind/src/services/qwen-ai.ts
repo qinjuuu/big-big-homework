@@ -369,6 +369,144 @@ ${docs.disclosureContent.substring(0, 4000)}
   }
 
   /**
+   * 生成摘要
+   */
+  async generateAbstract(specContent: string, claimsContent: string): Promise<QwenResponse> {
+    const systemPrompt = `你是一位专利代理人，擅长撰写简洁、准确的专利摘要。
+摘要要求：
+- 200-500字
+- 清楚概述技术问题、技术方案要点和主要用途
+- 不得使用商业性宣传用语
+- 与说明书和权利要求书内容一致`;
+
+    const userPrompt = `说明书：
+${specContent.substring(0, 5000)}
+
+权利要求书：
+${claimsContent.substring(0, 3000)}
+
+请根据以上内容撰写专利摘要。`;
+
+    return await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.4, maxTokens: 1024 });
+  }
+
+  /**
+   * 生成附图说明
+   */
+  async generateDrawingDesc(specContent: string): Promise<QwenResponse> {
+    const systemPrompt = `你是一位专利代理人，擅长撰写附图说明。
+请根据说明书内容，生成清晰的附图说明列表。
+格式示例：
+图1：XXX系统结构框图
+图2：XXX模块内部结构示意图
+...
+要求每张图标注其展示的内容和对应关系。`;
+
+    const userPrompt = `说明书：
+${specContent.substring(0, 6000)}
+
+请根据说明书描述，生成附图说明。`;
+
+    return await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.4, maxTokens: 1024 });
+  }
+
+  /**
+   * 基于知识库检索术语，用于补充交底书时的术语约束
+   */
+  async searchTerminology(techField: string, context: string, terminologyList: string[]): Promise<QwenResponse> {
+    const systemPrompt = `你是一位专利术语专家。
+根据给定的术语库和技术上下文，输出应使用的标准术语建议。
+
+输出格式：
+## 推荐术语
+1. 标准术语：XXX（替代俗语：YYY）
+2. ...
+
+## 术语一致性建议
+（1-2句话总结术语使用注意事项）
+
+如果没有相关术语，回复"无相关术语建议"。`;
+
+    const userPrompt = `技术领域：${techField}
+
+术语库中的术语：
+${terminologyList.join('\n')}
+
+技术上下文：
+${context.substring(0, 2000)}
+
+请分析并给出术语建议。`;
+
+    return await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.3, maxTokens: 1024 });
+  }
+
+  /**
+   * 专利检索 — AI 模拟检索已发表论文和专利，提供创新思路
+   */
+  async searchPatents(input: {
+    techField: string;
+    keywords: string[];
+    disclosureContent: string;
+  }): Promise<QwenResponse> {
+    const systemPrompt = `你是一位资深专利检索分析师，拥有海量专利数据库的访问权限。
+请根据提供的技术信息和关键词，模拟专利检索，给出结构化的检索结果。
+
+注意：
+- 输出必须看起来像真实的检索结果
+- 专利号使用有效的格式（CN+8位数字/字母，US+数字，EP+数字等）
+- 申请人应是合理的公司或机构名称
+- 相似度和风险等级要有区分度
+- 创新思路要基于现有技术的空白点
+
+输出格式：
+## 检索统计
+总检索文献数：XXXX
+相关专利数：XX
+高相关度：X
+综合风险等级：高/中/低
+
+## 现有技术列表
+| 专利号 | 名称 | 申请人 | 日期 | 相似度 | 风险等级 | 风险特征 | 风险位置 |
+|--------|------|--------|------|--------|----------|----------|----------|
+| CN20XXXXXXXXX.X | XXX | XXX公司 | 20XX-XX-XX | XX% | 高/中/低 | XXX | 权利要求X |
+
+## 新创性风险分析
+1. 【高/中/低风险】技术特征：XXX
+   相关专利：XXX
+   原因：XXX
+   建议：XXX
+
+## 创新思路推荐
+1. 创新点标题：XXX
+   实施方案：XXX
+   预期效果：XXX
+   可专利性分析：XXX`;
+
+    const userPrompt = `技术领域：${input.techField}
+
+检索关键词：${input.keywords.join('、')}
+
+技术描述：
+${input.disclosureContent.substring(0, 3000)}
+
+请检索相关专利和论文，给出结构化的检索报告。`;
+
+    return await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.6, maxTokens: 4096 });
+  }
+
+  /**
    * 术语统一检查
    */
   async checkTerminologyConsistency(content: string): Promise<QwenResponse> {

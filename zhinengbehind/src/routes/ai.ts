@@ -368,6 +368,143 @@ aiRouter.post('/innovate', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/ai/generate-five-books - 生成五书中的摘要和附图说明
+aiRouter.post('/generate-five-books', async (req: Request, res: Response) => {
+  try {
+    const { case_id, spec_content, claims_content } = req.body;
+
+    if (!spec_content || !claims_content) {
+      return res.status(400).json({ code: -1, message: '缺少说明书或权利要求书内容' });
+    }
+
+    console.log('开始生成五书（摘要 + 附图说明）...', { case_id });
+
+    const [abstractResult, drawingResult] = await Promise.all([
+      qwenAI.generateAbstract(spec_content, claims_content),
+      qwenAI.generateDrawingDesc(spec_content),
+    ]);
+
+    if (!abstractResult.success || !drawingResult.success) {
+      return res.status(500).json({
+        code: -1,
+        message: '五书生成失败',
+        error: abstractResult.error || drawingResult.error,
+      });
+    }
+
+    // 存入数据库
+    if (case_id) {
+      const fiveBooks = JSON.stringify({
+        abstract: abstractResult.content,
+        drawing_desc: drawingResult.content,
+      });
+      await pool.query(
+        'UPDATE sys_writing SET five_books_content = ? WHERE case_id = ?',
+        [fiveBooks, case_id]
+      );
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
+        [case_id, 'M07', 'generate_five_books', JSON.stringify({ spec_length: spec_content.length }), JSON.stringify({ abstract_length: abstractResult.content.length, drawing_desc_length: drawingResult.content.length })]
+      );
+    }
+
+    res.json({
+      code: 0,
+      data: {
+        abstract: abstractResult.content,
+        drawing_desc: drawingResult.content,
+        usage: { abstract: abstractResult.usage, drawing_desc: drawingResult.usage },
+      },
+    });
+  } catch (err: any) {
+    console.error('五书生成错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/search-terminology - AI 语义检索术语库
+aiRouter.post('/search-terminology', async (req: Request, res: Response) => {
+  try {
+    const { tech_field, context } = req.body;
+
+    if (!tech_field || !context) {
+      return res.status(400).json({ code: -1, message: '缺少 tech_field 或 context' });
+    }
+
+    // 从术语库查询相关领域的术语
+    const [rows] = await pool.query(
+      'SELECT term, definition, aliases FROM sys_terminology WHERE domain LIKE ? LIMIT 100',
+      [`%${tech_field}%`]
+    ) as any;
+
+    const terminologyList = rows.map((r: any) => `${r.term}：${r.definition}（别名：${r.aliases || '无'}）`);
+
+    if (terminologyList.length === 0) {
+      return res.json({ code: 0, data: { suggestions: '', terminology: [] } });
+    }
+
+    const result = await qwenAI.searchTerminology(tech_field, context, terminologyList);
+
+    res.json({
+      code: 0,
+      data: {
+        suggestions: result.success ? result.content : '',
+        terminology: rows,
+        usage: result.usage,
+      },
+    });
+  } catch (err: any) {
+    console.error('术语检索错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/search-patents - AI 专利检索
+aiRouter.post('/search-patents', async (req: Request, res: Response) => {
+  try {
+    const { case_id, tech_field, keywords, disclosure_content } = req.body;
+
+    if (!tech_field || !keywords || !disclosure_content) {
+      return res.status(400).json({ code: -1, message: '缺少必要参数' });
+    }
+
+    console.log('开始 AI 专利检索...', { case_id, tech_field, keywords });
+
+    const result = await qwenAI.searchPatents({
+      techField: tech_field,
+      keywords,
+      disclosureContent: disclosure_content,
+    });
+
+    if (!result.success) {
+      return res.status(500).json({
+        code: -1,
+        message: '专利检索失败',
+        error: result.error,
+      });
+    }
+
+    // 保存检索结果到 AI 日志
+    if (case_id) {
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
+        [case_id, 'M06', 'patent_search', JSON.stringify({ tech_field, keywords }), JSON.stringify({ output_length: result.content.length })]
+      );
+    }
+
+    res.json({
+      code: 0,
+      data: {
+        search_result: result.content,
+        usage: result.usage,
+      },
+    });
+  } catch (err: any) {
+    console.error('专利检索错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
 // POST /api/ai/upload - 文件上传处理
 aiRouter.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {

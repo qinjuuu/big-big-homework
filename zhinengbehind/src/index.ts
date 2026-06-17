@@ -10,6 +10,7 @@ import { statsRouter } from './routes/stats';
 import { authRouter } from './routes/auth';
 import { collabRouter } from './routes/collab';
 import { aiRouter } from './routes/ai';
+import { terminologyRouter } from './routes/terminology';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -52,6 +53,7 @@ app.use('/api/reviews', reviewsRouter);
 app.use('/api', statsRouter);
 app.use('/api/collab', collabRouter);
 app.use('/api/ai', aiRouter);
+app.use('/api/terminology', terminologyRouter);
 
 // 健康检查
 app.get('/api/health', (_req, res) => {

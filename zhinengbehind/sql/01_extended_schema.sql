@@ -27,7 +27,7 @@ CREATE TABLE sys_case (
 
 -- ========== 交底信息表 (扩展 M06 字段) ==========
 CREATE TABLE sys_disclosure (
-    id INT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     case_id VARCHAR(32) NOT NULL,
     source_content TEXT,
     ai_generate_content TEXT,
@@ -45,7 +45,7 @@ CREATE TABLE sys_disclosure (
 
 -- ========== 撰写内容表 ==========
 CREATE TABLE sys_writing (
-    id INT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     case_id VARCHAR(32) NOT NULL,
     spec_content LONGTEXT,
     claim_content LONGTEXT,
@@ -61,7 +61,7 @@ CREATE TABLE sys_writing (
 
 -- ========== 质检记录表 ==========
 CREATE TABLE sys_quality_check (
-    id INT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     case_id VARCHAR(32) NOT NULL,
     audit_result VARCHAR(50),
     audit_remark TEXT,
@@ -75,7 +75,7 @@ CREATE TABLE sys_quality_check (
 
 -- ========== 操作日志表 ==========
 CREATE TABLE sys_operation_log (
-    id INT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     case_id VARCHAR(32) NOT NULL,
     opt_type VARCHAR(30) NOT NULL,
     opt_user VARCHAR(50) NOT NULL,
@@ -87,7 +87,7 @@ CREATE TABLE sys_operation_log (
 
 -- ========== 撰写版本记录表 (M07 协同编辑支持) ==========
 CREATE TABLE sys_writing_version (
-    id INT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     case_id VARCHAR(32) NOT NULL,
     version_no INT NOT NULL,
     content_snapshot LONGTEXT,
@@ -98,7 +98,7 @@ CREATE TABLE sys_writing_version (
 
 -- ========== AI 检测与学习日志表 ==========
 CREATE TABLE sys_ai_log (
-    id INT PRIMARY KEY,
+    id INT AUTO_INCREMENT PRIMARY KEY,
     case_id VARCHAR(32) NOT NULL,
     module_type VARCHAR(20),
     ai_action VARCHAR(50),
