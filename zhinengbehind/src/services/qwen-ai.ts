@@ -584,6 +584,81 @@ ${content.substring(0, 8000)}`;
       };
     }
   }
+  /**
+   * 专利价值评估
+   */
+  async evaluatePatentValue(input: {
+    title: string;
+    techField: string;
+    problem: string;
+    solution: string;
+    effects: string;
+    claims?: string;
+  }): Promise<QwenResponse> {
+    const systemPrompt = `你是一位资深专利价值评估专家，擅长从技术、市场、法律三个维度综合评估专利价值。
+
+请按以下结构输出评估报告：
+
+## 综合评分
+- 总分：XX/100
+- 等级：A(≥85) / B(70-84) / C(55-69) / D(<55)
+
+## 一、技术价值（权重 35%）
+- 技术创新度（1-10分）：
+- 技术复杂度（1-10分）：
+- 技术成熟度（1-10分）：
+- 可替代性（1-10分，分数越高越难替代）：
+- 技术价值小计：XX/40
+- 分析说明：
+
+## 二、市场价值（权重 35%）
+- 市场规模潜力（1-10分）：
+- 产业化难度（1-10分，分数越高越容易产业化）：
+- 竞争态势（1-10分，分数越高竞争越小）：
+- 应用领域广度（1-10分）：
+- 市场价值小计：XX/40
+- 分析说明：
+
+## 三、法律价值（权重 30%）
+- 专利保护范围（1-10分）：
+- 侵权可检测性（1-10分）：
+- 规避设计难度（1-10分）：
+- 法律稳定性（1-10分）：
+- 法律价值小计：XX/40
+- 分析说明：
+
+## 四、综合评估
+- 核心优势（2-3点）
+- 主要风险（2-3点）
+- 商业化建议
+- 申请策略建议
+
+评分标准：每个维度 8-10 分为优秀，5-7 分为一般，1-4 分为较低。
+请严格、客观地评分，不要给出虚高的分数。`;
+
+    let userPrompt = `专利名称：${input.title}
+技术领域：${input.techField}
+
+技术问题：
+${input.problem}
+
+技术方案：
+${input.solution}
+
+有益效果：
+${input.effects}`;
+
+    if (input.claims) {
+      userPrompt += `\n\n权利要求：\n${input.claims.substring(0, 3000)}`;
+    }
+
+    userPrompt += '\n\n请对以上专利进行全面的价值评估。';
+
+    return await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.4, maxTokens: 4096 });
+  }
 }
 
 export default new QwenAIService();

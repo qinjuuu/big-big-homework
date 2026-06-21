@@ -505,6 +505,44 @@ aiRouter.post('/search-patents', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/ai/evaluate-value - 专利价值评估
+aiRouter.post('/evaluate-value', async (req: Request, res: Response) => {
+  try {
+    const { case_id, title, tech_field, problem, solution, effects, claims } = req.body;
+
+    if (!title || !tech_field || !problem || !solution) {
+      return res.status(400).json({ code: -1, message: '缺少必要参数' });
+    }
+
+    console.log('开始专利价值评估...', { case_id, title });
+
+    const result = await qwenAI.evaluatePatentValue({
+      title,
+      techField: tech_field,
+      problem,
+      solution,
+      effects: effects || '',
+      claims,
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ code: -1, message: '价值评估失败', error: result.error });
+    }
+
+    if (case_id) {
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
+        [case_id, 'M06', 'evaluate_value', JSON.stringify({ title, tech_field }), JSON.stringify({ output_length: result.content.length })]
+      );
+    }
+
+    res.json({ code: 0, data: { evaluation: result.content, usage: result.usage } });
+  } catch (err: any) {
+    console.error('价值评估错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
 // POST /api/ai/upload - 文件上传处理
 aiRouter.post('/upload', upload.single('file'), async (req: Request, res: Response) => {
   try {
