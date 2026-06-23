@@ -16,7 +16,7 @@ import {
   Download,
   Eye,
 } from "lucide-react"
-import { getWritingById } from "@/lib/api"
+import { getWritingById, createReview } from "@/lib/api"
 
 interface SubmitM08PageProps {
   onBack: () => void
@@ -134,14 +134,24 @@ export function SubmitM08Page({ onBack, onNavigate, writingId }: SubmitM08PagePr
   const allPassed = checkItems.filter((i) => i.required).every((i) => i.passed)
   const blockedItems = checkItems.filter((i) => i.required && !i.passed)
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
+    if (!writing?.case_id) {
+      alert("缺少案件信息，无法提交审核")
+      return
+    }
     setIsSubmitting(true)
-    setTimeout(() => {
+    try {
+      // 调用后端 API 创建审核记录
+      await createReview({ case_id: writing.case_id })
       setIsSubmitting(false)
       setSubmitted(true)
       // 任务编号优先来自后端
       setTaskNo(writing?.review_task_no || writing?.case_id || "")
-    }, 800)
+    } catch (err) {
+      console.error("提交审核失败:", err)
+      alert("提交审核失败，请检查网络或联系管理员")
+      setIsSubmitting(false)
+    }
   }
 
   if (submitted) {

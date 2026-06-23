@@ -34,7 +34,7 @@ import {
   ChevronRight,
   MoreHorizontal,
 } from "lucide-react"
-import { M06ProgressBar } from "@/components/vast/m06/m06-progress-bar"
+import { M06ProgressBar } from "@/components/vast/m6/m06-progress-bar"
 import {
   DropdownMenu,
   DropdownMenuContent,

@@ -5,56 +5,60 @@ import { AppHeader } from "@/components/vast/app-header"
 import { AppSidebar } from "@/components/vast/app-sidebar"
 // 登录和首页
 import { LoginPage } from "@/components/vast/login-page"
+// ... existing code ...
 import { HomeDashboard } from "@/components/vast/home-dashboard"
 // M05 咨询立案组件
-import { ConsultationFilingDashboard } from "@/components/vast/m05/consultation-filing-dashboard"
-import { ConsultationFilingList } from "@/components/vast/m05/consultation-filing-list"
+import { ConsultationFilingDashboard } from "@/components/vast/m5/consultation-filing-dashboard"
+import { ConsultationFilingList } from "@/components/vast/m5/consultation-filing-list"
 import { PresaleTicketDetail } from "@/components/vast/presale/presale-ticket-detail"
 import { PresaleForm } from "@/components/vast/presale-form"
 // M06 组件
-import { EngineDashboard as P01Dashboard } from "@/components/vast/m06/p01-dashboard"
-import { ModelList } from "@/components/vast/m06/model-list"
-import { CreateModel } from "@/components/vast/m06/create-model"
-import { ModelDetail } from "@/components/vast/m06/model-detail"
-import { AIInspection } from "@/components/vast/m06/ai-inspection"
-import { DisclosureSupplement } from "@/components/vast/m06/disclosure-supplement"
-import { SupplementModeSelection } from "@/components/vast/m06/supplement-mode-selection"
-import { SupplementFastMode } from "@/components/vast/m06/supplement-fast-mode"
-import { SupplementExpertMode } from "@/components/vast/m06/supplement-expert-mode"
-import { SecondSearch } from "@/components/vast/m06/second-search"
-import { PriorArtComparison } from "@/components/vast/m06/prior-art-comparison"
-import { FactStructuring } from "@/components/vast/m06/fact-structuring"
-import { RelationModeling } from "@/components/vast/m06/relation-modeling"
-import { CompletenessValidation } from "@/components/vast/m06/completeness-validation"
-import { DisclosurePackage } from "@/components/vast/m06/disclosure-package"
-import { SubmitM07 } from "@/components/vast/m06/submit-m07"
+import { EngineDashboard as P01Dashboard } from "@/components/vast/m6/p01-dashboard"
+import { ModelList } from "@/components/vast/m6/model-list"
+import { CreateModel } from "@/components/vast/m6/create-model"
+import { ModelDetail } from "@/components/vast/m6/model-detail"
+import { AIInspection } from "@/components/vast/m6/ai-inspection"
+import { DisclosureSupplement } from "@/components/vast/m6/disclosure-supplement"
+import { SupplementModeSelection } from "@/components/vast/m6/supplement-mode-selection"
+import { SupplementFastMode } from "@/components/vast/m6/supplement-fast-mode"
+import { SupplementExpertMode } from "@/components/vast/m6/supplement-expert-mode"
+import { SecondSearch } from "@/components/vast/m6/second-search"
+import { PriorArtComparison } from "@/components/vast/m6/prior-art-comparison"
+import { FactStructuring } from "@/components/vast/m6/fact-structuring"
+import { RelationModeling } from "@/components/vast/m6/relation-modeling"
+import { CompletenessValidation } from "@/components/vast/m6/completeness-validation"
+import { DisclosurePackage } from "@/components/vast/m6/disclosure-package"
+import { SubmitM07 } from "@/components/vast/m6/submit-m07"
 // M07 组件
-import { CreationDashboard } from "@/components/vast/m07/creation-dashboard"
-import { CreationTaskList } from "@/components/vast/m07/creation-task-list"
-import { DualDocWorkspace } from "@/components/vast/m07/dual-doc-workspace"
-import { SpecDraftPage } from "@/components/vast/m07/spec-draft-page"
-import { ClaimsWritingPage } from "@/components/vast/m07/claims-writing-page"
-import { FullReviewPage } from "@/components/vast/m07/full-review-page"
-import { FiveBooksPage } from "@/components/vast/m07/five-books-page"
-import { SubmitM08Page } from "@/components/vast/m07/submit-m08-page"
+import { CreationDashboard } from "@/components/vast/m7/creation-dashboard"
+import { CreationTaskList } from "@/components/vast/m7/creation-task-list"
+import { DualDocWorkspace } from "@/components/vast/m7/dual-doc-workspace"
+import { SpecDraftPage } from "@/components/vast/m7/spec-draft-page"
+import { ClaimsWritingPage } from "@/components/vast/m7/claims-writing-page"
+import { FullReviewPage } from "@/components/vast/m7/full-review-page"
+import { FiveBooksPage } from "@/components/vast/m7/five-books-page"
+import { SubmitM08Page } from "@/components/vast/m7/submit-m08-page"
 // M08 组件
-import { ReviewDashboard } from "@/components/vast/m08/review-dashboard"
-import { ReviewTaskList } from "@/components/vast/m08/review-task-list"
-import { ReviewTaskDetail } from "@/components/vast/m08/review-task-detail"
-import { DisclosureReviewPage } from "@/components/vast/m08/disclosure-review"
-import { ReviewDecisionPage } from "@/components/vast/m08/review-decision"
+import { ReviewDashboard } from "@/components/vast/m8/review-dashboard"
+import { ReviewTaskList } from "@/components/vast/m8/review-task-list"
+import { ReviewTaskDetail } from "@/components/vast/m8/review-task-detail"
+import { DisclosureReviewPage } from "@/components/vast/m8/disclosure-review"
+import { ReviewDecisionPage } from "@/components/vast/m8/review-decision"
 // M09 组件
-import { CaseDashboard } from "@/components/vast/m09/case-dashboard"
-import { AllCasesList } from "@/components/vast/m09/all-cases-list"
-import { CaseDetail } from "@/components/vast/m09/case-detail"
-import { WaitingCases } from "@/components/vast/m09/waiting-cases"
-import { ProtectionCenter } from "@/components/vast/m09/protection-center"
-import { NationalIP } from "@/components/vast/m09/national-ip"
-import { ScrapCases } from "@/components/vast/m09/scrap-cases"
-import { KnowledgeAssets } from "@/components/vast/m09/knowledge-assets"
+import { CaseDashboard } from "@/components/vast/m9/case-dashboard"
+import { AllCasesList } from "@/components/vast/m9/all-cases-list"
+import { CaseDetail } from "@/components/vast/m9/case-detail"
+import { WaitingCases } from "@/components/vast/m9/waiting-cases"
+import { ProtectionCenter } from "@/components/vast/m9/protection-center"
+import { NationalIP } from "@/components/vast/m9/national-ip"
+import { ScrapCases } from "@/components/vast/m9/scrap-cases"
+import { KnowledgeAssets } from "@/components/vast/m9/knowledge-assets"
+import { PreSubmitCheck } from "@/components/vast/m9/pre-submit-check"
 // M10 组件
 import { ResourceDashboard } from "@/components/vast/m10/resource-dashboard"
 import { ResourceLibrary } from "@/components/vast/m10/resource-library"
+// ... existing code ...
+
 // 系统设置组件
 import { SystemSettings } from "@/components/vast/system/system-settings"
 import { RoleManagement } from "@/components/vast/system/role-management"
@@ -113,6 +117,7 @@ type Page =
     | "m09-all-cases"
     | "m09-case-detail"
     | "m09-waiting-cases"
+    | "m09-pre-submit-check"
     | "m09-protection-center"
     | "m09-national-ip"
     | "m09-scrap-cases"
@@ -139,6 +144,9 @@ type Page =
     | "sys-notifications"
     | "sys-integration"
     | "sys-logs"
+    // M11 专利价值评估
+    | "m11-evaluate"
+    | "m11-record"
 
 export default function Home() {
     const [isLoggedIn, setIsLoggedIn] = useState(true)
@@ -160,7 +168,7 @@ export default function Home() {
         else if (page === "m06-create-model") setCurrentPage("m06-p02-decomposition");
         else if (page === "dashboard") setCurrentPage("home");
         else {
-            if (page === "m09-case-detail") {
+            if (page === "m09-case-detail" || page === "m09-pre-submit-check") {
                 if (typeof payload === "string") setSelectedCaseId(payload)
                 else if (payload && typeof payload === "object" && typeof payload.caseId === "string") setSelectedCaseId(payload.caseId)
             }
@@ -212,7 +220,7 @@ export default function Home() {
             case "m05-dashboard":
                 return <ConsultationFilingDashboard onNavigate={handleNavigate} />
             case "m05-new":
-                return <PresaleForm onBack={() => setCurrentPage("m05-dashboard")} />
+                return <PresaleForm onBack={() => setCurrentPage("m05-dashboard")} onNavigate={handleNavigate} />
             case "m05-list":
                 return <ConsultationFilingList onNavigate={handleNavigate} />
             case "m05-detail":
@@ -315,6 +323,7 @@ export default function Home() {
                         onBack={() => setCurrentPage("m06-p11-package")}
                         onSubmit={() => setCurrentPage("m07-dashboard")}
                         onNavigate={handleNavigate}
+                        caseId={selectedCaseId}
                     />
                 )
             case "m06-p13-version":
@@ -380,6 +389,8 @@ export default function Home() {
                 return <CaseDetail caseId={selectedCaseId} onNavigate={handleNavigate} />
             case "m09-waiting-cases":
                 return <WaitingCases onNavigate={handleNavigate} />
+            case "m09-pre-submit-check":
+                return <PreSubmitCheck caseId={selectedCaseId} onBack={() => setCurrentPage("m09-waiting-cases")} onNavigate={handleNavigate} />
             case "m09-protection-center":
                 return <ProtectionCenter onNavigate={handleNavigate} />
             case "m09-national-ip":
@@ -414,6 +425,11 @@ export default function Home() {
                 return <ResourceLibrary libraryType="samples" onNavigate={handleNavigate} />
             case "m10-statistics":
                 return <ResourceLibrary libraryType="samples" onNavigate={handleNavigate} />
+
+            // M11 专利价值评估
+            case "m11-evaluate":
+            case "m11-record":
+                return <ResourceDashboard onNavigate={handleNavigate} />
 
             // 系统设置页面
             case "sys-settings":

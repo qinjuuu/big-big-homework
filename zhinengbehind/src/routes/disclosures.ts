@@ -113,10 +113,10 @@ disclosuresRouter.put('/:id', async (req: Request, res: Response) => {
 // POST /api/disclosures - 创建交底书（从M05转入M06）
 disclosuresRouter.post('/', async (req: Request, res: Response) => {
   try {
-    const { case_id, source_content } = req.body;
+    const { case_id, source_content, source_files } = req.body;
     await pool.query(
-      'INSERT INTO sys_disclosure (case_id, source_content, m06_stage, m06_status) VALUES (?, ?, ?, ?)',
-      [case_id, source_content || '', 'DECOMPOSITION', 'IN_PROGRESS']
+      'INSERT INTO sys_disclosure (case_id, source_content, source_files, m06_stage, m06_status) VALUES (?, ?, ?, ?, ?)',
+      [case_id, source_content || '', source_files ? JSON.stringify(source_files) : null, 'DECOMPOSITION', 'IN_PROGRESS']
     );
     await pool.query(
       "UPDATE sys_case SET case_status = '撰写中' WHERE case_id = ?",

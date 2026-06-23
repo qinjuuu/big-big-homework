@@ -199,7 +199,7 @@ export async function getDisclosureById(id: number | string): Promise<Disclosure
   return getDisclosureDetail(id);
 }
 
-export async function createDisclosure(data: { case_id: string; source_content?: string }): Promise<void> {
+export async function createDisclosure(data: { case_id: string; source_content?: string; source_files?: any }): Promise<void> {
   return request('/disclosures', { method: 'POST', body: JSON.stringify(data) });
 }
 
@@ -539,6 +539,7 @@ export async function uploadAIFile(file: File): Promise<{
     : null;
   const formData = new FormData();
   formData.append('file', file);
+  formData.append('originalname', file.name);
 
   const res = await fetch(`${BASE_URL}/ai/upload`, {
     method: 'POST',
@@ -648,4 +649,83 @@ export async function getPatentEvaluateRecords(params?: {
  */
 export async function getPatentEvaluateDetail(id: number): Promise<PatentEvaluateResult> {
   return request<PatentEvaluateResult>(`/patent-evaluate/${id}`);
+}
+
+// ========== 权利要求书模板 API ==========
+export interface ClaimsTemplateItem {
+  id: number;
+  name: string;
+  type: string;
+  description: string;
+  independent_claim: string;
+  dependent_claims: string;
+  create_time: string;
+  update_time: string;
+}
+
+export async function getClaimsTemplates(): Promise<ClaimsTemplateItem[]> {
+  return request<ClaimsTemplateItem[]>('/claims-templates');
+}
+
+export async function getClaimsTemplateDetail(id: number): Promise<ClaimsTemplateItem> {
+  return request<ClaimsTemplateItem>(`/claims-templates/${id}`);
+}
+
+// ========== 交底书模板 API ==========
+export interface DisclosureTemplateItem {
+  id: number;
+  name: string;
+  type: string;
+  description: string;
+  sections: Array<{ name: string; required: boolean; description: string; example: string }>;
+  create_time: string;
+  update_time: string;
+}
+
+export async function getDisclosureTemplates(): Promise<DisclosureTemplateItem[]> {
+  return request<DisclosureTemplateItem[]>('/disclosure-templates');
+}
+
+export async function getDisclosureTemplateDetail(id: number): Promise<DisclosureTemplateItem> {
+  return request<DisclosureTemplateItem>(`/disclosure-templates/${id}`);
+}
+
+// ========== 交案前检查 API ==========
+export interface PreSubmitCheckSection {
+  status: string;
+  score: number;
+  items: Array<{ name: string; status: string; detail: string }>;
+}
+
+export interface PreSubmitCheckResult {
+  overallStatus: 'pass' | 'fail';
+  totalScore: number;
+  formalCheck: PreSubmitCheckSection;
+  completenessCheck: PreSubmitCheckSection;
+  consistencyCheck: PreSubmitCheckSection;
+  summary: string;
+}
+
+export async function aiPreSubmitCheck(data: {
+  caseId?: string;
+  disclosureContent?: string;
+  specContent?: string;
+  claimsContent?: string;
+  fiveBooksContent?: string;
+}): Promise<PreSubmitCheckResult> {
+  return request<PreSubmitCheckResult>('/ai/pre-submit-check', { method: 'POST', body: JSON.stringify(data) });
+}
+
+// ========== AI生成附图 API ==========
+export interface DrawingGenerationResult {
+  drawingSuggestion: string;
+  figureNumber: string;
+  keyElements: string[];
+}
+
+export async function aiGenerateDrawing(data: {
+  caseId?: string;
+  specContent: string;
+}): Promise<DrawingGenerationResult> {
+  return request<DrawingGenerationResult>('/ai/generate-drawing', { method: 'POST', body: JSON.stringify(data) });
 }

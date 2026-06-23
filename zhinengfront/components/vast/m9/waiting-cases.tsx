@@ -11,7 +11,7 @@ import { Send, Clock, AlertTriangle, CheckCircle, Eye, FileCheck } from "lucide-
 import { getCases, type CaseItem } from "@/lib/api"
 
 interface WaitingCasesProps {
-  onNavigate: (page: string) => void
+  onNavigate: (page: string, payload?: any) => void
 }
 
 export function WaitingCases({ onNavigate }: WaitingCasesProps) {
@@ -86,7 +86,12 @@ export function WaitingCases({ onNavigate }: WaitingCasesProps) {
       </div>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">待交案列表</CardTitle></CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <CardTitle className="text-base">待交案列表</CardTitle>
+          <Button variant="outline" size="sm" onClick={() => onNavigate("m09-pre-submit-check", selectedCases[0])}>
+            <FileCheck className="mr-2 h-4 w-4" />批量预检
+          </Button>
+        </CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -117,9 +122,14 @@ export function WaitingCases({ onNavigate }: WaitingCasesProps) {
                         <Eye className="h-4 w-4" />
                       </Button>
                       {item.case_status === "pending_submit" && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary">
-                          <Send className="h-4 w-4" />
-                        </Button>
+                        <>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={() => onNavigate("m09-pre-submit-check", item.case_id)}>
+                            <FileCheck className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-primary">
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        </>
                       )}
                     </div>
                   </TableCell>

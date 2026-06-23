@@ -24,8 +24,12 @@ import {
   GitBranch,
   FileText,
   Lightbulb,
+  Sparkles,
+  Image,
 } from "lucide-react"
 import { getWritingById } from "@/lib/api"
+import { ClaimsTemplateSelector } from "@/components/vast/claims-template-selector"
+import { aiGenerateDrawing, type DrawingGenerationResult } from "@/lib/api"
 
 interface ClaimsWritingPageProps {
   onBack: () => void
@@ -173,6 +177,9 @@ export function ClaimsWritingPage({ onBack, writingId }: ClaimsWritingPageProps)
   const [selectedClaim, setSelectedClaim] = useState<string>("")
   const [showHierarchy, setShowHierarchy] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
+  const [isGeneratingDrawing, setIsGeneratingDrawing] = useState(false)
+  const [drawingResult, setDrawingResult] = useState<DrawingGenerationResult | null>(null)
 
   useEffect(() => {
     if (!writingId) {
@@ -202,6 +209,48 @@ export function ClaimsWritingPage({ onBack, writingId }: ClaimsWritingPageProps)
 
   const currentClaim = claims.find((c) => c.id === selectedClaim)
   const independentClaims = claims.filter((c) => c.type === "independent")
+
+  const handleSelectTemplate = (template: any) => {
+    const newClaims: Claim[] = []
+    const independent = template.independent_claim
+    const dependents = template.dependent_claims?.split('\n').filter((s: string) => s.trim()) || []
+    const newNumber = 1
+    newClaims.push({
+      id: `c${newNumber}`,
+      number: newNumber,
+      type: "independent",
+      text: independent,
+      supportStatus: "unchecked",
+      supportParagraphs: [],
+    })
+    dependents.forEach((dep: string, idx: number) => {
+      const refMatch = dep.match(/根据权利要求\s*(\d+)/)
+      newClaims.push({
+        id: `c${idx + 2}`,
+        number: idx + 2,
+        type: "dependent",
+        text: dep,
+        refClaim: refMatch ? parseInt(refMatch[1], 10) : 1,
+        supportStatus: "unchecked",
+        supportParagraphs: [],
+      })
+    })
+    setClaims(newClaims)
+    if (newClaims.length > 0) setSelectedClaim(newClaims[0].id)
+  }
+
+  const handleGenerateDrawing = async () => {
+    if (!writing?.spec_content) return
+    setIsGeneratingDrawing(true)
+    try {
+      const result = await aiGenerateDrawing({ caseId: writing.case_id, specContent: writing.spec_content })
+      setDrawingResult(result)
+    } catch (err) {
+      console.error('AI附图生成失败:', err)
+    } finally {
+      setIsGeneratingDrawing(false)
+    }
+  }
 
   const handleAddIndependent = () => {
     const newNumber = claims.length === 0 ? 1 : Math.max(...claims.map((c) => c.number)) + 1
@@ -258,6 +307,10 @@ export function ClaimsWritingPage({ onBack, writingId }: ClaimsWritingPageProps)
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" onClick={() => setShowTemplateSelector(true)}>
+            <FileText className="h-4 w-4 mr-2" />
+            模板库
+          </Button>
           <Button variant="outline" size="sm" onClick={handleAddIndependent}>
             <Plus className="h-4 w-4 mr-2" />
             新增独权
@@ -273,6 +326,10 @@ export function ClaimsWritingPage({ onBack, writingId }: ClaimsWritingPageProps)
           <Button variant="outline" size="sm" onClick={() => setShowHierarchy(!showHierarchy)}>
             <GitBranch className="h-4 w-4 mr-2" />
             层级图
+          </Button>
+          <Button variant="outline" size="sm" onClick={handleGenerateDrawing} disabled={isGeneratingDrawing}>
+            {isGeneratingDrawing ? <Sparkles className="h-4 w-4 mr-2 animate-spin" /> : <Image className="h-4 w-4 mr-2" />}
+            AI附图
           </Button>
           <Button size="sm">
             <Save className="h-4 w-4 mr-2" />
@@ -495,6 +552,29 @@ export function ClaimsWritingPage({ onBack, writingId }: ClaimsWritingPageProps)
           </Card>
         </div>
       </div>
+
+      {showTemplateSelector && (
+        <ClaimsTemplateSelector
+          onSelect={handleSelectTemplate}
+          onClose={() => setShowTemplateSelector(false)}
+        />
+      )}
+
+      {drawingResult && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="bg-white rounded-lg shadow-lg max-w-lg w-full p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-base font-semibold">AI附图建议</h3>
+              <Button variant="ghost" size="sm" onClick={() => setDrawingResult(null)}>关闭</Button>
+            </div>
+            <div className="space-y-3 text-sm">
+              <div><strong>图号：</strong>{drawingResult.figureNumber}</div>
+              <div><strong>建议：</strong>{drawingResult.drawingSuggestion}</div>
+              <div><strong>关键元素：</strong>{drawingResult.keyElements.join('、')}</div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

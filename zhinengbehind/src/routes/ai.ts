@@ -1,15 +1,44 @@
 import { Router, Request, Response } from 'express';
 import pool from '../db/connection';
-import qwenAI from '../services/qwen-ai';
+import { qwenAI } from '../services/qwen-ai';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
+import os from 'os';
+
+const UPLOAD_DIR = path.join(os.tmpdir(), 'vast-uploads');
 
 export const aiRouter = Router();
 
+// AI 日志记录（容错处理，表不存在时静默忽略）
+async function logAIAction(
+  caseId: string,
+  moduleType: string,
+  action: string,
+  inputData: string,
+  outputData: string,
+  humanFeedback?: string
+) {
+  try {
+    if (humanFeedback !== undefined) {
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data, human_feedback) VALUES (?, ?, ?, ?, ?, ?)',
+        [caseId, moduleType, action, inputData, outputData, humanFeedback]
+      );
+    } else {
+      await pool.query(
+        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
+        [caseId, moduleType, action, inputData, outputData]
+      );
+    }
+  } catch (err: any) {
+    console.warn('AI 日志记录失败（表可能不存在）:', err.message);
+  }
+}
+
 // 配置文件上传
 const storage = multer.diskStorage({
-  destination: './uploads/',
+  destination: UPLOAD_DIR,
   filename: (req, file, cb) => {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
     cb(null, uniqueSuffix + path.extname(file.originalname));
@@ -18,8 +47,8 @@ const storage = multer.diskStorage({
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } });
 
 // 确保上传目录存在
-if (!fs.existsSync('./uploads')) {
-  fs.mkdirSync('./uploads');
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 }
 
 // POST /api/ai/generate-disclosure - AI 辅助生成交底书
@@ -48,7 +77,7 @@ aiRouter.post('/generate-disclosure', async (req: Request, res: Response) => {
     }
 
     // 如果有上下文，生成创新思路
-    let innovationIdeas = [];
+    let innovationIdeas: string[] = [];
     if (innovation_context) {
       const ideasResult = await qwenAI.generateInnovationIdeas({
         techField: tech_field || '未知领域',
@@ -68,9 +97,10 @@ aiRouter.post('/generate-disclosure', async (req: Request, res: Response) => {
       );
 
       // 记录 AI 日志
-      await pool.query(
-        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
-        [case_id, 'M06', 'generate_disclosure', JSON.stringify({ tech_field, source_length: source_content.length }), JSON.stringify({ output_length: result.content.length })]
+      await logAIAction(
+        case_id, 'M06', 'generate_disclosure',
+        JSON.stringify({ tech_field, source_length: source_content.length }),
+        JSON.stringify({ output_length: result.content.length })
       );
     }
 
@@ -128,9 +158,11 @@ aiRouter.post('/check-ai-rate', async (req: Request, res: Response) => {
 
     // 记录 AI 日志
     if (case_id) {
-      await pool.query(
-        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data, human_feedback) VALUES (?, ?, ?, ?, ?, ?)',
-        [case_id, 'M07', 'check_ai_rate', JSON.stringify({ content_length: content.length }), JSON.stringify({ ai_rate: aiRate }), JSON.stringify(suggestions)]
+      await logAIAction(
+        case_id, 'M07', 'check_ai_rate',
+        JSON.stringify({ content_length: content.length }),
+        JSON.stringify({ ai_rate: aiRate }),
+        JSON.stringify(suggestions)
       );
     }
 
@@ -183,9 +215,10 @@ aiRouter.post('/generate-spec', async (req: Request, res: Response) => {
         [case_id, result.content, 'drafting']
       );
 
-      await pool.query(
-        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
-        [case_id, 'M07', 'generate_spec', JSON.stringify({ disclosure }), JSON.stringify({ spec_length: result.content.length })]
+      await logAIAction(
+        case_id, 'M07', 'generate_spec',
+        JSON.stringify({ disclosure }),
+        JSON.stringify({ spec_length: result.content.length })
       );
     }
 
@@ -230,9 +263,10 @@ aiRouter.post('/generate-claims', async (req: Request, res: Response) => {
         [result.content, case_id]
       );
 
-      await pool.query(
-        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
-        [case_id, 'M07', 'generate_claims', JSON.stringify({ spec_length: spec_content.length }), JSON.stringify({ claims_length: result.content.length })]
+      await logAIAction(
+        case_id, 'M07', 'generate_claims',
+        JSON.stringify({ spec_length: spec_content.length }),
+        JSON.stringify({ claims_length: result.content.length })
       );
     }
 
@@ -281,9 +315,10 @@ aiRouter.post('/review', async (req: Request, res: Response) => {
         [case_id, result.content, 'ai_reviewed']
       );
 
-      await pool.query(
-        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
-        [case_id, 'M08', 'quality_review', JSON.stringify({ doc_types: ['spec', 'claims'] }), JSON.stringify({ advice_length: result.content.length })]
+      await logAIAction(
+        case_id, 'M08', 'quality_review',
+        JSON.stringify({ doc_types: ['spec', 'claims'] }),
+        JSON.stringify({ advice_length: result.content.length })
       );
     }
 
@@ -402,9 +437,10 @@ aiRouter.post('/generate-five-books', async (req: Request, res: Response) => {
         'UPDATE sys_writing SET five_books_content = ? WHERE case_id = ?',
         [fiveBooks, case_id]
       );
-      await pool.query(
-        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
-        [case_id, 'M07', 'generate_five_books', JSON.stringify({ spec_length: spec_content.length }), JSON.stringify({ abstract_length: abstractResult.content.length, drawing_desc_length: drawingResult.content.length })]
+      await logAIAction(
+        case_id, 'M07', 'generate_five_books',
+        JSON.stringify({ spec_length: spec_content.length }),
+        JSON.stringify({ abstract_length: abstractResult.content.length, drawing_desc_length: drawingResult.content.length })
       );
     }
 
@@ -486,9 +522,10 @@ aiRouter.post('/search-patents', async (req: Request, res: Response) => {
 
     // 保存检索结果到 AI 日志
     if (case_id) {
-      await pool.query(
-        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
-        [case_id, 'M06', 'patent_search', JSON.stringify({ tech_field, keywords }), JSON.stringify({ output_length: result.content.length })]
+      await logAIAction(
+        case_id, 'M06', 'patent_search',
+        JSON.stringify({ tech_field, keywords }),
+        JSON.stringify({ output_length: result.content.length })
       );
     }
 
@@ -530,9 +567,10 @@ aiRouter.post('/evaluate-value', async (req: Request, res: Response) => {
     }
 
     if (case_id) {
-      await pool.query(
-        'INSERT INTO sys_ai_log (case_id, module_type, ai_action, input_data, output_data) VALUES (?, ?, ?, ?, ?)',
-        [case_id, 'M06', 'evaluate_value', JSON.stringify({ title, tech_field }), JSON.stringify({ output_length: result.content.length })]
+      await logAIAction(
+        case_id, 'M06', 'evaluate_value',
+        JSON.stringify({ title, tech_field }),
+        JSON.stringify({ output_length: result.content.length })
       );
     }
 
@@ -550,17 +588,141 @@ aiRouter.post('/upload', upload.single('file'), async (req: Request, res: Respon
       return res.status(400).json({ code: -1, message: '没有上传文件' });
     }
 
+    const originalname = (req.body?.originalname as string) || (req.file.originalname as string);
+
     res.json({ 
       code: 0, 
       data: { 
         filename: req.file.filename,
-        originalname: req.file.originalname,
+        originalname: originalname,
         path: req.file.path,
         size: req.file.size
       } 
     });
   } catch (err: any) {
     console.error('文件上传错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/pre-submit-check - 交案前检查
+aiRouter.post('/pre-submit-check', async (req: Request, res: Response) => {
+  try {
+    const { caseId, disclosureContent, specContent, claimsContent, fiveBooksContent } = req.body;
+
+    console.log('开始交案前检查...', { caseId });
+
+    const result = await qwenAI.preSubmitCheck({
+      disclosureContent,
+      specContent,
+      claimsContent,
+      fiveBooksContent,
+    });
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: '交案前检查失败',
+        error: result.error 
+      });
+    }
+
+    // 尝试解析 AI 返回的 JSON
+    let parsedResult: any;
+    try {
+      // 尝试从 AI 返回中提取 JSON
+      const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedResult = JSON.parse(jsonMatch[0]);
+      } else {
+        parsedResult = JSON.parse(result.content);
+      }
+    } catch (parseErr) {
+      console.warn('AI 返回格式非标准 JSON，使用默认结构:', parseErr);
+      // 构建默认结构
+      parsedResult = {
+        overallStatus: 'fail',
+        totalScore: 50,
+        formalCheck: { status: 'fail', score: 50, items: [{ name: '格式检查', status: 'warning', detail: 'AI 返回格式异常，请人工复核' }] },
+        completenessCheck: { status: 'fail', score: 50, items: [{ name: '完整性检查', status: 'warning', detail: 'AI 返回格式异常，请人工复核' }] },
+        consistencyCheck: { status: 'fail', score: 50, items: [{ name: '一致性检查', status: 'warning', detail: 'AI 返回格式异常，请人工复核' }] },
+        summary: result.content.substring(0, 500) || 'AI 检查完成，但返回格式异常',
+      };
+    }
+
+    // 记录 AI 日志
+    if (caseId) {
+      await logAIAction(
+        caseId, 'M09', 'pre_submit_check',
+        JSON.stringify({ caseId }),
+        JSON.stringify({ result: parsedResult.overallStatus, score: parsedResult.totalScore })
+      );
+    }
+
+    res.json({ 
+      code: 0, 
+      data: parsedResult
+    });
+  } catch (err: any) {
+    console.error('交案前检查错误:', err);
+    res.status(500).json({ code: -1, message: err.message });
+  }
+});
+
+// POST /api/ai/generate-drawing - AI 生成附图建议
+aiRouter.post('/generate-drawing', async (req: Request, res: Response) => {
+  try {
+    const { caseId, specContent } = req.body;
+    
+    if (!specContent) {
+      return res.status(400).json({ code: -1, message: '缺少说明书内容' });
+    }
+
+    console.log('开始生成附图建议...', { caseId });
+
+    const result = await qwenAI.generateMainDrawing({ specContent });
+
+    if (!result.success) {
+      return res.status(500).json({ 
+        code: -1, 
+        message: '附图生成失败',
+        error: result.error 
+      });
+    }
+
+    // 尝试解析 AI 返回的 JSON
+    let parsedResult: any;
+    try {
+      const jsonMatch = result.content.match(/\{[\s\S]*\}/);
+      if (jsonMatch) {
+        parsedResult = JSON.parse(jsonMatch[0]);
+      } else {
+        parsedResult = JSON.parse(result.content);
+      }
+    } catch (parseErr) {
+      console.warn('AI 返回格式非标准 JSON，使用默认结构:', parseErr);
+      parsedResult = {
+        drawingSuggestion: result.content.substring(0, 500) || '请根据说明书内容设计附图',
+        figureNumber: '图1',
+        keyElements: ['主要结构', '关键部件'],
+      };
+    }
+
+    // 记录 AI 日志
+    if (caseId) {
+      await logAIAction(
+        caseId, 'M07', 'generate_drawing',
+        JSON.stringify({ spec_length: specContent.length }),
+        JSON.stringify({ suggestion: parsedResult.drawingSuggestion })
+      );
+    }
+
+    res.json({ 
+      code: 0, 
+      data: parsedResult
+    });
+  } catch (err: any) {
+    console.error('附图生成错误:', err);
     res.status(500).json({ code: -1, message: err.message });
   }
 });

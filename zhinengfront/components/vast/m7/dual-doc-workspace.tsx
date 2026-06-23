@@ -9,6 +9,7 @@ import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { OnlyOfficeEditor } from "./onlyoffice-editor"
+import { CollaborativeEditor } from "@/components/vast/collaborative-editor"
 import { getDisclosureById, type DisclosureItem } from "@/lib/api"
 import {
   ChevronLeft,
@@ -27,6 +28,7 @@ import {
   Minus,
   PanelLeftClose,
   PanelLeft,
+  Users,
 } from "lucide-react"
 
 interface DualDocWorkspaceProps {
@@ -131,6 +133,7 @@ export function DualDocWorkspace({ onBack, disclosureId }: DualDocWorkspaceProps
   const [currentTab, setCurrentTab] = useState("spec")
   const [expandedSections, setExpandedSections] = useState<string[]>([])
   const [leftPanelCollapsed, setLeftPanelCollapsed] = useState(false)
+  const [collaborativeMode, setCollaborativeMode] = useState(false)
 
   const [disclosure, setDisclosure] = useState<any | null>(null)
   const [disclosureTree, setDisclosureTree] = useState<DisclosureTreeNode[]>([])
@@ -200,6 +203,14 @@ export function DualDocWorkspace({ onBack, disclosureId }: DualDocWorkspaceProps
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button
+            variant={collaborativeMode ? "default" : "outline"}
+            size="sm"
+            onClick={() => setCollaborativeMode(!collaborativeMode)}
+          >
+            <Users className="h-4 w-4 mr-2" />
+            {collaborativeMode ? "退出协作" : "协作编辑"}
+          </Button>
           <Button variant="outline" size="sm">
             <Save className="h-4 w-4 mr-2" />
             保存版本
@@ -387,13 +398,21 @@ export function DualDocWorkspace({ onBack, disclosureId }: DualDocWorkspaceProps
             </Tabs>
           </div>
 
-          {/* OnlyOffice 编辑器区域 */}
+          {/* 编辑器区域 */}
           <div className="flex-1 p-4">
-            <OnlyOfficeEditor
-              documentTitle={`${disclosure?.case_name || "未命名"}-${getDocumentTitle()}`}
-              documentType={currentTab as "spec" | "claims" | "abstract" | "drawings"}
-              showAiAssist={true}
-            />
+            {collaborativeMode ? (
+              <CollaborativeEditor
+                caseId={disclosure?.case_id || "CASE001"}
+                docType={currentTab === "spec" ? "spec" : currentTab === "claims" ? "claims" : "five_books"}
+                onContentChange={(content) => console.log("Content changed:", content.length)}
+              />
+            ) : (
+              <OnlyOfficeEditor
+                documentTitle={`${disclosure?.case_name || "未命名"}-${getDocumentTitle()}`}
+                documentType={currentTab as "spec" | "claims" | "abstract" | "drawings"}
+                showAiAssist={true}
+              />
+            )}
           </div>
         </div>
       </div>

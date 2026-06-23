@@ -8,7 +8,8 @@ import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
-import { M06ProgressBar } from "@/components/vast/m06/m06-progress-bar"
+import { M06ProgressBar } from "@/components/vast/m6/m06-progress-bar"
+import { createWriting } from "@/lib/api"
 import {
   ArrowLeft,
   CheckCircle,
@@ -28,6 +29,7 @@ interface SubmitM07Props {
   onBack?: () => void
   onSubmit?: () => void
   onNavigate?: (page: string) => void
+  caseId?: string
 }
 
 // 前置条件检查清单（待对接真实校验结果）
@@ -36,9 +38,11 @@ const checklistItems: Array<{ id: string; label: string; status: "pass" | "warni
 // 风险提示（待对接真实校验结果）
 const riskItems: Array<{ level: string; message: string }> = []
 
-export function SubmitM07({ onBack, onSubmit, onNavigate }: SubmitM07Props) {
+export function SubmitM07({ onBack, onSubmit, onNavigate, caseId }: SubmitM07Props) {
   const [confirmed, setConfirmed] = useState(false)
   const [remarks, setRemarks] = useState("")
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
 
   const passCount = checklistItems.filter(item => item.status === "pass").length
   const warningCount = checklistItems.filter(item => item.status === "warning").length
@@ -46,6 +50,54 @@ export function SubmitM07({ onBack, onSubmit, onNavigate }: SubmitM07Props) {
   const requiredFailCount = checklistItems.filter(item => item.required && item.status === "fail").length
 
   const canSubmit = requiredFailCount === 0 && confirmed
+
+  const handleSubmit = async () => {
+    if (!caseId) {
+      alert("缺少案件ID，无法创建撰写任务")
+      return
+    }
+    setIsSubmitting(true)
+    try {
+      // 调用后端 API 创建撰写记录
+      await createWriting({ case_id: caseId, write_user: "前端用户" })
+      setSubmitted(true)
+      // 2秒后自动跳转
+      setTimeout(() => {
+        onSubmit?.()
+      }, 1500)
+    } catch (err) {
+      console.error("创建撰写任务失败:", err)
+      alert("提交失败，请检查网络或联系管理员")
+    } finally {
+      setIsSubmitting(false)
+    }
+  }
+
+  if (submitted) {
+    return (
+      <div className="h-[calc(100vh-56px)] flex items-center justify-center bg-[#F5F7FA]">
+        <Card className="w-[480px]">
+          <CardContent className="p-8 text-center">
+            <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+            <h2 className="text-xl font-semibold text-[#111827] mb-2">提交成功</h2>
+            <p className="text-sm text-[#6B7280] mb-6">
+              已成功创建 M07 撰写任务，案件状态已变更为"撰写中"
+            </p>
+            <div className="flex gap-3">
+              <Button variant="outline" onClick={onBack} className="flex-1">
+                返回 M06
+              </Button>
+              <Button onClick={() => onNavigate?.("m07-dashboard")} className="flex-1 bg-[#2F80ED]">
+                前往 M07 创作
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
 
   return (
     <div className="flex flex-col h-full">
@@ -71,11 +123,11 @@ export function SubmitM07({ onBack, onSubmit, onNavigate }: SubmitM07Props) {
           </Button>
           <Button 
             className="bg-[#2F80ED] hover:bg-[#1E5EFF]"
-            disabled={!canSubmit}
-            onClick={onSubmit}
+            disabled={!canSubmit || isSubmitting}
+            onClick={handleSubmit}
           >
             <Send className="h-4 w-4 mr-2" />
-            确认提交M07
+            {isSubmitting ? "提交中..." : "确认提交M07"}
           </Button>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { AlertTriangle, CheckCircle, AlertCircle, ChevronLeft } from 'lucide-react'
-import { getReviewDetail, type ReviewIssueItem } from '@/lib/api'
+import { getReviewDetail, updateReview, type ReviewIssueItem } from '@/lib/api'
 
 interface ReviewIssue {
   id: number
@@ -100,21 +100,51 @@ export function ReviewDecisionPage({ onNavigate, reviewId }: ReviewDecisionPageP
   const hasAnyIssues =
     blockingIssues.length + warningIssues.length + adviceIssues.length > 0
 
-  const handleSubmitDecision = () => {
+  const handleSubmitDecision = async () => {
+    if (!reviewId) {
+      alert("缺少审核记录ID")
+      return
+    }
     setIsSubmitting(true)
-    setTimeout(() => {
+    try {
+      // 调用后端 API 更新审核结果
+      let auditResult = ''
+      let m08Status = ''
+      if (decision === 'pass') {
+        auditResult = '通过'
+        m08Status = 'completed'
+      } else if (decision === 'reject-m06') {
+        auditResult = '退回M06'
+        m08Status = 'rejected'
+      } else if (decision === 'reject-m07') {
+        auditResult = '退回M07'
+        m08Status = 'rejected'
+      } else if (decision === 'reject-case') {
+        auditResult = '废案'
+        m08Status = 'rejected'
+      }
+      await updateReview(Number(reviewId), {
+        audit_result: auditResult,
+        audit_remark: decisionComment,
+        audit_user: '前端用户',
+        m08_status: m08Status,
+      })
       setIsSubmitting(false)
       // 根据决策结果跳转到对应模块
       if (decision === 'pass') {
         onNavigate?.('m09-dashboard') // 审核通过 → M09 案件管理
       } else if (decision === 'reject-m06') {
-        onNavigate?.('m06-dashboard') // 退回M06 → M06 交底书引擎
+        onNavigate?.('m06-p01-dashboard') // 退回M06 → M06 交底书引擎
       } else if (decision === 'reject-m07') {
         onNavigate?.('m07-dashboard') // 退回M07 → M07 专利创作
       } else if (decision === 'reject-case') {
         onNavigate?.('m09-scrap-cases') // 废案 → M09 废案管理
       }
-    }, 1000)
+    } catch (err) {
+      console.error("提交审核决策失败:", err)
+      alert("提交审核决策失败，请检查网络或联系管理员")
+      setIsSubmitting(false)
+    }
   }
 
   const decisionOptions = [

@@ -1,6 +1,6 @@
 "use client"
 
-import { useRef, useState } from "react"
+import { useRef, useState, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -14,16 +14,17 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
-import { ArrowLeft, Upload, FileText, X, Paperclip, CheckCircle2, Clock, User, Building2, Lightbulb, FolderUp } from "lucide-react"
-import { createCase, uploadAIFile } from "@/lib/api"
+import { ArrowLeft, Upload, FileText, X, Paperclip, CheckCircle2, Clock, User, Building2, Lightbulb, FolderUp, Loader2 } from "lucide-react"
+import { createCase, uploadAIFile, createDisclosure, updateCase, getUsers } from "@/lib/api"
 
 interface PresaleFormProps {
   onBack: () => void
+  onNavigate?: (page: string) => void
 }
 
 type UploadedFile = { name: string; size: string; type: string; serverPath?: string }
 
-export function PresaleForm({ onBack }: PresaleFormProps) {
+export function PresaleForm({ onBack, onNavigate }: PresaleFormProps) {
   const [formData, setFormData] = useState({
     clientName: "",
     applicantName: "",
@@ -37,7 +38,11 @@ export function PresaleForm({ onBack }: PresaleFormProps) {
     expectedDate: "",
     isSigned: "no",
     materialNote: "",
+    engineer: "",
   })
+
+  const [engineers, setEngineers] = useState<Array<{ id: number; username: string; display_name: string }>>([])
+  const [loadingEngineers, setLoadingEngineers] = useState(false)
 
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, UploadedFile[]>>({
     disclosure: [],
@@ -50,6 +55,22 @@ export function PresaleForm({ onBack }: PresaleFormProps) {
   const [uploadingCategory, setUploadingCategory] = useState<string | null>(null)
   const [activeUploadCategory, setActiveUploadCategory] = useState<string>("disclosure")
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  // 加载工程师列表
+  useEffect(() => {
+    const loadEngineers = async () => {
+      setLoadingEngineers(true)
+      try {
+        const result = await getUsers({ role: "engineer", status: 1 })
+        setEngineers(result || [])
+      } catch {
+        setEngineers([])
+      } finally {
+        setLoadingEngineers(false)
+      }
+    }
+    loadEngineers()
+  }, [])
 
   const update = (key: string, value: string) =>
     setFormData((prev) => ({ ...prev, [key]: value }))
@@ -112,7 +133,7 @@ export function PresaleForm({ onBack }: PresaleFormProps) {
       } catch {}
       const currentName = loginUser?.display_name || loginUser?.username || "系统"
 
-      // 调用后端 API 创建案件
+      // 1. 调用后端 API 创建案件
       const result = await createCase({
         case_name: `${formData.clientName}-${formData.consultPurpose}-咨询`,
         patent_type: formData.patentType === "invention" ? "发明专利" : "实用新型",
@@ -125,12 +146,30 @@ export function PresaleForm({ onBack }: PresaleFormProps) {
         priority: formData.hasTimeRequirement === "yes" ? "high" : "normal",
         source_type: "presale",
       })
+      const caseId = result.case_id
 
-      console.log("✅ 咨询提交成功，案件ID:", result.case_id)
-      alert(`咨询提交成功！\n案件编号：${result.case_id}\n状态：待分配`)
-      
-      // 返回上一页
-      onBack()
+      // 2. 如果选择了工程师，更新案件工程师
+      if (formData.engineer) {
+        await updateCase(caseId, { engineer: formData.engineer })
+      }
+
+      // 3. 创建交底书，关联上传文件
+      const allFiles = Object.values(uploadedFiles).flat()
+      const sourceFiles = allFiles.length > 0
+        ? allFiles.map((f) => ({ name: f.name, type: f.type, path: f.serverPath }))
+        : undefined
+
+      await createDisclosure({
+        case_id: caseId,
+        source_content: formData.materialNote || "",
+        source_files: sourceFiles,
+      })
+
+      console.log("✅ 立案成功，案件ID:", caseId, "已转入 M06 交底书引擎")
+      alert(`立案成功！\n案件编号：${caseId}\n已自动转入交底书补全流程`)
+
+      // 4. 导航到 M06 交底书引擎
+      onNavigate?.("m06-p01-dashboard")
     } catch (error) {
       console.error("❌ 提交失败:", error)
       alert("提交失败，请检查网络连接或联系管理员")
@@ -183,7 +222,7 @@ export function PresaleForm({ onBack }: PresaleFormProps) {
           <Button variant="outline" size="sm" className="h-9 px-4 border-[#E2E8F0]" onClick={onBack}>
             取消
           </Button>
-          <Button variant="outline" size="sm" className="h-9 px-4 border-[#E2E8F0]">
+          <Button variant="outline" size="sm" className="h-9 px-4 border-[#E2E8F0]" onClick={() => alert("草稿已保存到本地")}>
             保存草稿
           </Button>
           <Button size="sm" className="h-9 px-5 bg-[#2563EB] hover:bg-[#1D4ED8] text-white shadow-sm" onClick={handleSubmit} disabled={isSubmitting}>
@@ -409,6 +448,42 @@ export function PresaleForm({ onBack }: PresaleFormProps) {
                         </label>
                       </RadioGroup>
                     </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* 工程师分配 */}
+              <div className="bg-white rounded-2xl border border-[#E2E8F0] overflow-hidden shadow-sm">
+                <div className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-[#F8FAFC] to-white border-b border-[#E2E8F0]">
+                  <div className="flex items-center justify-center w-9 h-9 rounded-xl bg-[#EFF6FF]">
+                    <User className="h-4 w-4 text-[#2563EB]" />
+                  </div>
+                  <div>
+                    <h2 className="text-sm font-semibold text-[#0F172A]">工程师分配</h2>
+                    <p className="text-xs text-[#94A3B8]">为该案件指定专利工程师</p>
+                  </div>
+                </div>
+                <div className="p-6">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium text-[#334155]">专利工程师</Label>
+                    <Select value={formData.engineer} onValueChange={(v) => update("engineer", v)}>
+                      <SelectTrigger className="h-10 border-[#E2E8F0]">
+                        <SelectValue placeholder={loadingEngineers ? "加载中..." : "请选择专利工程师"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {engineers.map((eng) => (
+                          <SelectItem key={eng.id} value={eng.display_name || eng.username}>
+                            {eng.display_name || eng.username} (工程师)
+                          </SelectItem>
+                        ))}
+                        {engineers.length === 0 && !loadingEngineers && (
+                          <div className="px-3 py-2 text-sm text-[#94A3B8]">暂无可用工程师</div>
+                        )}
+                      </SelectContent>
+                    </Select>
+                    {engineers.length === 0 && !loadingEngineers && (
+                      <p className="text-xs text-[#94A3B8]">请到系统设置中添加工程师用户</p>
+                    )}
                   </div>
                 </div>
               </div>

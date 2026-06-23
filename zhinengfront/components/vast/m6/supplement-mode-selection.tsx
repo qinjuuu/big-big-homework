@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { M06ProgressBar } from "@/components/vast/m06/m06-progress-bar"
+import { M06ProgressBar } from "@/components/vast/m6/m06-progress-bar"
 import {
   ArrowLeft,
   Zap,

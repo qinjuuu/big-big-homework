@@ -28,8 +28,9 @@ import {
   GitBranch,
   Save,
 } from "lucide-react"
-import { M06ProgressBar } from "@/components/vast/m06/m06-progress-bar"
+import { M06ProgressBar } from "@/components/vast/m6/m06-progress-bar"
 import { getDisclosureById, type DisclosureItem } from "@/lib/api"
+import { DisclosureTemplateSelector } from "@/components/vast/disclosure-template-selector"
 
 interface ModelDetailProps {
   disclosureId?: number | string
@@ -159,6 +160,7 @@ export function ModelDetail({ disclosureId, onBack, onNavigate }: ModelDetailPro
   const [isCheckingInnovation, setIsCheckingInnovation] = useState(false)
   const [completenessChecked, setCompletenessChecked] = useState(false)
   const [innovationChecked, setInnovationChecked] = useState(false)
+  const [showTemplateSelector, setShowTemplateSelector] = useState(false)
 
   const materials = useMemo<MaterialItem[]>(() => buildMaterialsFromDisclosure(disclosure), [disclosure])
   const modules = useMemo<ModuleConfig[]>(() => buildModulesFromDisclosure(disclosure), [disclosure])
@@ -341,6 +343,10 @@ export function ModelDetail({ disclosureId, onBack, onNavigate }: ModelDetailPro
           </div>
         </div>
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="text-xs h-8 gap-1.5" onClick={() => setShowTemplateSelector(true)}>
+            <FileText className="h-3.5 w-3.5" />
+            模板库
+          </Button>
           <Button variant="outline" size="sm" className="text-xs h-8 gap-1.5">
             <Save className="h-3.5 w-3.5" />
             保存草稿
@@ -805,6 +811,35 @@ export function ModelDetail({ disclosureId, onBack, onNavigate }: ModelDetailPro
           </div>
         </aside>
       </div>
+
+      {showTemplateSelector && (
+        <DisclosureTemplateSelector
+          onSelect={(template) => {
+            if (template.sections) {
+              const newStates: Record<string, any> = {}
+              template.sections.forEach((sec: any) => {
+                const keyMap: Record<string, string> = {
+                  技术领域: 'background',
+                  背景技术: 'background',
+                  技术问题: 'problem',
+                  技术方案: 'solution',
+                  关键保护点: 'keypoints',
+                  有益效果: 'effect',
+                  具体实施方式: 'solution',
+                  替代方案: 'alternatives',
+                }
+                const key = keyMap[sec.name] || sec.name
+                if (key) {
+                  newStates[key] = { content: sec.example || '', confirmed: false, needSupplement: !sec.required }
+                }
+              })
+              setModuleStates((prev) => ({ ...prev, ...newStates }))
+            }
+            setShowTemplateSelector(false)
+          }}
+          onClose={() => setShowTemplateSelector(false)}
+        />
+      )}
     </div>
   )
 }

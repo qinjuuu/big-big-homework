@@ -176,7 +176,7 @@ export function SpecDraftPage({ onBack, onEdit, writingId }: SpecDraftPageProps)
                 <RefreshCw className="h-4 w-4 mr-2" />
                 重新加载
               </Button>
-              <Button variant="outline">
+              <Button variant="outline" onClick={() => alert("初稿已接受，请进入编辑完善")}>
                 <Check className="h-4 w-4 mr-2" />
                 接受初稿
               </Button>

@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { M06ProgressBar } from "@/components/vast/m06/m06-progress-bar"
+import { M06ProgressBar } from "@/components/vast/m6/m06-progress-bar"
 import {
   ArrowLeft,
   ChevronRight,

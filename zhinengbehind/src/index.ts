@@ -11,6 +11,12 @@ import { authRouter } from './routes/auth';
 import { collabRouter } from './routes/collab';
 import { aiRouter } from './routes/ai';
 import { terminologyRouter } from './routes/terminology';
+import { usersRouter } from './routes/users';
+import { rolesRouter } from './routes/roles';
+import { patentEvaluateRouter } from './routes/patent-evaluate';
+import { claimsTemplateRouter } from './routes/claims-templates';
+import { disclosureTemplateRouter } from './routes/disclosure-templates';
+import { createWebSocketServer } from './services/websocket';
 
 dotenv.config({ path: path.resolve(__dirname, '../.env') });
 
@@ -54,14 +60,20 @@ app.use('/api', statsRouter);
 app.use('/api/collab', collabRouter);
 app.use('/api/ai', aiRouter);
 app.use('/api/terminology', terminologyRouter);
+app.use('/api/users', usersRouter);
+app.use('/api/roles', rolesRouter);
+app.use('/api/patent-evaluate', patentEvaluateRouter);
+app.use('/api/claims-templates', claimsTemplateRouter);
+app.use('/api/disclosure-templates', disclosureTemplateRouter);
 
 // 健康检查
 app.get('/api/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-app.listen(PORT, () => {
+const server = app.listen(PORT, () => {
   console.log(`VAST Backend running on http://localhost:${PORT}`);
 });
 
-export default app;
+// 启动 WebSocket 协作编辑服务
+createWebSocketServer(server);

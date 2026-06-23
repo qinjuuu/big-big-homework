@@ -32,16 +32,15 @@ class QwenAIService {
     this.config = {
       apiUrl: process.env.QWEN_API_URL || 'https://dashscope.aliyuncs.com/compatible-mode/v1/chat/completions',
       modelName: process.env.QWEN_MODEL || 'qwen-max',
-      apiKey: process.env.QWEN_API_KEY || '',
+      apiKey: '',
       temperature: 0.7,
       maxTokens: 4096,
       ...config,
     };
+  }
 
-    if (!this.config.apiKey) {
-      console.warn('⚠️  QWEN_API_KEY 未配置，AI 功能将无法正常工作');
-      console.warn('请在 .env 文件中配置您的 DashScope API Key');
-    }
+  private getApiKey(): string {
+    return this.config.apiKey || process.env.QWEN_API_KEY || '';
   }
 
   /**
@@ -52,7 +51,7 @@ class QwenAIService {
     maxTokens?: number;
   }): Promise<QwenResponse> {
     try {
-      if (!this.config.apiKey) {
+      if (!this.getApiKey()) {
         throw new Error('API Key 未配置');
       }
 
@@ -68,7 +67,7 @@ class QwenAIService {
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.apiKey}`,
+            'Authorization': `Bearer ${this.getApiKey()}`,
           },
           timeout: 60000, // 60秒超时
         }
@@ -541,7 +540,7 @@ ${content.substring(0, 8000)}`;
    */
   async analyzeImage(imageBase64: string, prompt: string): Promise<QwenResponse> {
     try {
-      if (!this.config.apiKey) {
+      if (!this.getApiKey()) {
         throw new Error('API Key 未配置');
       }
 
@@ -564,7 +563,7 @@ ${content.substring(0, 8000)}`;
         {
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${this.config.apiKey}`,
+            'Authorization': `Bearer ${this.getApiKey()}`,
           },
           timeout: 60000,
         }
@@ -659,6 +658,109 @@ ${input.effects}`;
       { role: 'user', content: userPrompt },
     ], { temperature: 0.4, maxTokens: 4096 });
   }
+
+  /**
+   * 交案前检查 - 全面检查五书格式、内容完整性、一致性
+   */
+  async preSubmitCheck(input: {
+    disclosureContent?: string;
+    specContent?: string;
+    claimsContent?: string;
+    fiveBooksContent?: string;
+  }): Promise<QwenResponse> {
+    const systemPrompt = `你是一位资深的专利审查专家，负责对专利申请文件进行全面的交案前检查。
+
+请从以下三个维度进行检查：
+
+## 一、形式审查
+检查专利申请文件的格式是否符合要求：
+- 文件格式是否规范（PDF、Word等）
+- 页码、页眉页脚是否完整
+- 字体、字号是否符合要求
+- 附图格式是否标准
+- 签字盖章是否齐全
+
+## 二、完整性检查
+检查五书内容是否完整：
+- 说明书是否包含：技术领域、背景技术、发明内容、附图说明、具体实施方式
+- 权利要求书是否包含独立权利要求和从属权利要求
+- 摘要是否在200-500字之间
+- 附图说明是否对应所有附图
+- 申请人信息是否完整
+
+## 三、一致性检查
+检查各文件之间是否一致：
+- 术语前后是否一致
+- 附图标记是否与说明书中一致
+- 权利要求中的技术特征是否得到说明书支持
+- 说明书中的技术方案是否与交底书一致
+
+输出格式（JSON）：
+{
+  "overallStatus": "pass" 或 "fail",
+  "totalScore": 0-100的整数,
+  "formalCheck": {
+    "status": "pass" 或 "warning" 或 "fail",
+    "score": 0-100的整数,
+    "items": [
+      { "name": "检查项名称", "status": "pass" 或 "warning" 或 "fail", "detail": "详细说明" }
+    ]
+  },
+  "completenessCheck": { ...同上结构... },
+  "consistencyCheck": { ...同上结构... },
+  "summary": "总体评价总结"
 }
 
-export default new QwenAIService();
+请严格按照JSON格式输出，确保可以被程序解析。`;
+
+    const userPrompt = `请对以下专利申请文件进行交案前检查：
+
+${input.disclosureContent || input.specContent ? '说明书/交底书内容：\n' + (input.disclosureContent || input.specContent || '').substring(0, 5000) : '未提供说明书内容'}
+
+${input.claimsContent ? '权利要求书：\n' + input.claimsContent.substring(0, 3000) : '未提供权利要求书'}
+
+${input.fiveBooksContent ? '五书内容：\n' + input.fiveBooksContent.substring(0, 2000) : '未提供五书'}
+
+请输出严格的JSON格式检查结果。`;
+
+    return await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.3, maxTokens: 4096 });
+  }
+
+  /**
+   * 生成主要附图建议
+   */
+  async generateMainDrawing(input: {
+    specContent: string;
+  }): Promise<QwenResponse> {
+    const systemPrompt = `你是一位专业的专利附图设计专家，擅长根据专利说明书内容设计主要附图。
+
+请根据说明书内容，提供：
+1. 建议的图号和图名
+2. 附图应包含的关键元素
+3. 附图的设计建议（布局、标注方式等）
+
+输出格式（JSON）：
+{
+  "drawingSuggestion": "附图设计建议描述",
+  "figureNumber": "图1",
+  "keyElements": ["元素1", "元素2", "元素3"]
+}
+
+请确保输出严格的JSON格式。`;
+
+    const userPrompt = `请根据以下专利说明书内容，设计主要附图：
+
+${input.specContent.substring(0, 6000)}`;
+
+    return await this.chat([
+      { role: 'system', content: systemPrompt },
+      { role: 'user', content: userPrompt },
+    ], { temperature: 0.5, maxTokens: 2048 });
+  }
+}
+
+export const qwenAI = new QwenAIService();
+export default qwenAI;
